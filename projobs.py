@@ -1,6 +1,7 @@
 import csv
 import logging
 import os
+import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler, ConversationHandler
 
@@ -19,6 +20,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Directory to store CVs
+CV_DIR = "cvs"
+os.makedirs(CV_DIR, exist_ok=True)
+
+# Directory to store exported CSV
+EXPORT_DIR = "exports"
+os.makedirs(EXPORT_DIR, exist_ok=True)
+
+# Database setup
+def init_db():
+    conn = sqlite3.connect('applicants.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS applicants (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            cv TEXT,
+            cover_letter TEXT,
+            portfolio TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_applicant(user_id, cv, cover_letter, portfolio):
+    conn = sqlite3.connect('applicants.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO applicants (user_id, cv, cover_letter, portfolio)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, cv, cover_letter, portfolio))
+    conn.commit()
+    conn.close()
+
+def fetch_applicants():
+    conn = sqlite3.connect('applicants.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM applicants')
+    applicants = c.fetchall()
+    conn.close()
+    return applicants
+
 # Bot commands
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("Welcome to the Job Application Bot! Type /apply to start applying for jobs.")
@@ -29,8 +72,10 @@ async def apply(update: Update, context: CallbackContext) -> int:
 
 async def cv_handler(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
-    file_id = update.message.document.file_id
-    user_data[user_id] = {'cv': file_id}
+    file = await context.bot.get_file(update.message.document.file_id)
+    file_path = os.path.join(CV_DIR, f'cv_{user_id}.pdf')
+    await file.download_to_drive(file_path)
+    user_data[user_id] = {'cv': file_path}
     await update.message.reply_text("CV uploaded successfully. Please type your cover letter.")
     return COVER_LETTER
 
@@ -46,10 +91,10 @@ async def portfolio_handler(update: Update, context: CallbackContext) -> int:
     portfolio_link = update.message.text
     user_data[user_id]['portfolio'] = portfolio_link if portfolio_link.lower() != 'none' else None
     await update.message.reply_text("Thank you for providing your information. Your application has been submitted.")
-    
-    # Print user data for testing
-    print(user_data)
-    
+
+    # Save application data to the database
+    save_applicant(user_id, user_data[user_id]['cv'], user_data[user_id]['cover_letter'], user_data[user_id]['portfolio'])
+
     return ConversationHandler.END
 
 async def cancel(update: Update, context: CallbackContext) -> int:
@@ -72,20 +117,32 @@ async def error_handler(update: Update, context: CallbackContext) -> None:
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
 
 async def export_data(update: Update, context: CallbackContext) -> None:
-    # Generate CSV data from user_data
+    # Fetch applicants from the database
+    applicants = fetch_applicants()
+
+    # Generate CSV data from applicants
     csv_data = []
-    for user_id, data in user_data.items():
-        csv_data.append([user_id, data.get('cv', ''), data.get('cover_letter', ''), data.get('portfolio', '')])
+    for applicant in applicants:
+        csv_data.append([applicant[1], applicant[2], applicant[3], applicant[4]])
+
+    csv_file_path = os.path.join(EXPORT_DIR, 'applicants.csv')
 
     # Write CSV data to a file
-    with open('user_data.csv', 'w', newline='') as csvfile:
+    with open(csv_file_path, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['User ID', 'CV', 'Cover Letter', 'Portfolio'])
-        writer.writerows(csv_data)
+        for data in csv_data:
+            writer.writerow(data)
 
-    await update.message.reply_document(document=open('user_data.csv', 'rb'))
+    logger.info(f"CSV file created at: {csv_file_path}")
 
+    await update.message.reply_document(document=open(csv_file_path, 'rb'))
+
+# New Code
 def main() -> None:
+    # Initialize the database
+    init_db()
+
     # Set up the application
     application = Application.builder().token(TOKEN).build()
 
@@ -112,7 +169,6 @@ def main() -> None:
 
     # Start the bot
     application.run_polling()
-    print("Current working directory:", os.getcwd())
 
 if __name__ == '__main__':
     main()

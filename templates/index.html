@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Applicants</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">Applicants</h1>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>CV</th>
+                        <th>Cover Letter</th>
+                        <th>Portfolio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for applicant in applicants %}
+                    <tr>
+                        <td>{{ applicant[1] }}</td>
+                        <td><a href="{{ applicant[2] }}">Download CV</a></td>
+                        <td>{{ applicant[3] }}</td>
+                        <td>{{ applicant[4] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a class="button is-primary" href="{{ url_for('download_csv') }}">Download CSV</a>
+        </div>
+    </section>
+</body>
+</html>
