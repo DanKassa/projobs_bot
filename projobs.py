@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler, ConversationHandler
 
 # Token for accessing the Telegram Bot API
-TOKEN = "7344637429:AAGMMZ_rIraxp7wWwP6FPnbMreM0Okqdt_E"
+TOKEN = "7219287029:AAG2jmkKnlek34CnE7NoIzzMGBMFSpCrGkY"
 
 # Conversation states
 CV, COVER_LETTER, PORTFOLIO = range(3)
